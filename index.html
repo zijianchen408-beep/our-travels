@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我们的旅行 · 两个人的足迹</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="logo">✈ 我们的旅行</div>
+      <nav class="nav">
+        <a href="#timeline">时间线</a>
+        <a href="#map-section">足迹</a>
+        <button id="btn-settings" class="link-btn" type="button">设置</button>
+        <button id="btn-add-trip" class="btn btn-primary" type="button">+ 记录一次旅行</button>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <p class="hero-eyebrow" id="hero-names">我们 的 旅行手账</p>
+      <h1>把每一次出发，都写成我们的故事</h1>
+      <p class="hero-sub">记录和 TA 一起看过的风景、吃过的美食、走过的街巷。</p>
+      <p class="hero-days" id="together-days"></p>
+      <div class="stats" id="stats"></div>
+    </div>
+  </section>
+
+  <div class="toolbar container">
+    <input id="search" type="search" placeholder="搜索目的地或标题…">
+    <select id="year-filter">
+      <option value="">全部年份</option>
+    </select>
+    <span class="toolbar-spacer"></span>
+    <span id="sync-status" class="sync-status"></span>
+    <button id="btn-export" class="btn btn-ghost" type="button">导出备份</button>
+    <label class="btn btn-ghost">
+      导入备份
+      <input type="file" id="import-file" accept="application/json" hidden>
+    </label>
+  </div>
+
+  <main>
+    <section id="timeline" class="container">
+      <h2 class="section-title">旅行时间线</h2>
+      <div id="timeline-list" class="timeline"></div>
+      <div id="empty-tip" class="empty hidden">
+        <p>还没有旅行记录。</p>
+        <p>点击右上角「记录一次旅行」，写下你们的第一段故事吧。</p>
+      </div>
+    </section>
+
+    <section id="map-section" class="container">
+      <h2 class="section-title">我们的足迹地图</h2>
+      <p class="map-tip">拖动旋转 · 滚轮缩放 · 点击标记可打开对应的旅行</p>
+      <div id="china-map" class="china-map"></div>
+      <p id="map-unmatched" class="map-unmatched hidden"></p>
+    </section>
+
+    <section id="cities" class="container">
+      <h2 class="section-title">一起去过的地方</h2>
+      <div id="city-cloud" class="city-cloud"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>愿往后的每一程，都有你在身边。</p>
+  </footer>
+
+  <!-- 新增 / 编辑旅行 -->
+  <div class="modal hidden" id="trip-modal">
+    <div class="modal-panel">
+      <h3 id="trip-modal-title">记录一次旅行</h3>
+      <form id="trip-form">
+        <div class="form-row">
+          <label>旅行标题
+            <input type="text" id="f-title" required maxlength="40" placeholder="例如：成都四日行">
+          </label>
+        </div>
+        <div class="form-row form-row-2">
+          <label>目的地
+            <input type="text" id="f-destination" required maxlength="20" placeholder="例如：成都">
+          </label>
+          <label>同行心情
+            <select id="f-mood">
+              <option value="">选择心情</option>
+              <option>开心</option>
+              <option>放松</option>
+              <option>浪漫</option>
+              <option>惊喜</option>
+              <option>感动</option>
+              <option>疲惫但值得</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row form-row-2">
+          <label>出发日期
+            <input type="date" id="f-start" required>
+          </label>
+          <label>返回日期
+            <input type="date" id="f-end" required>
+          </label>
+        </div>
+        <div class="form-row form-row-2">
+          <label>天气
+            <input type="text" id="f-weather" maxlength="10" placeholder="例如：晴 / 小雨">
+          </label>
+          <label>推荐指数
+            <select id="f-rating">
+              <option value="5">★★★★★</option>
+              <option value="4">★★★★</option>
+              <option value="3">★★★</option>
+              <option value="2">★★</option>
+              <option value="1">★</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label>封面照片（可选）
+            <input type="file" id="f-cover" accept="image/*">
+          </label>
+          <div id="cover-preview" class="cover-preview hidden"></div>
+        </div>
+        <div class="form-row">
+          <label>旅行随笔
+            <textarea id="f-description" rows="4" maxlength="500" placeholder="这一路发生了什么？把想记住的写下来…"></textarea>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" data-close>取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 旅行详情 -->
+  <div class="modal hidden" id="detail-modal">
+    <div class="modal-panel modal-panel-wide" id="detail-content"></div>
+  </div>
+
+  <!-- 添加 / 编辑瞬间 -->
+  <div class="modal hidden" id="moment-modal">
+    <div class="modal-panel">
+      <h3 id="moment-modal-title">添加瞬间</h3>
+      <form id="moment-form">
+        <div class="form-row">
+          <label>照片（可选）
+            <input type="file" id="m-file" accept="image/*">
+          </label>
+          <div id="m-preview" class="cover-preview hidden"></div>
+        </div>
+        <div class="form-row">
+          <label>这一刻
+            <input type="text" id="m-caption" maxlength="60" placeholder="这一刻发生了什么？">
+          </label>
+        </div>
+        <div class="form-row">
+          <label>日期（可选）
+            <input type="date" id="m-date">
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" data-close>取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 设置 -->
+  <div class="modal hidden" id="settings-modal">
+    <div class="modal-panel">
+      <h3>关于我们</h3>
+      <form id="settings-form">
+        <div class="form-row form-row-2">
+          <label>我的昵称
+            <input type="text" id="s-name-a" maxlength="10" placeholder="例如：阿黎">
+          </label>
+          <label>TA 的昵称
+            <input type="text" id="s-name-b" maxlength="10" placeholder="例如：小舟">
+          </label>
+        </div>
+        <div class="form-row">
+          <label>在一起的日期
+            <input type="date" id="s-together-date">
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" data-close>取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 图片放大查看 -->
+  <div class="lightbox hidden" id="lightbox">
+    <img id="lightbox-img" src="" alt="照片">
+    <p class="lightbox-caption" id="lightbox-caption"></p>
+  </div>
+
+  <script src="js/vendor/echarts.min.js"></script>
+  <script src="js/vendor/echarts-gl.min.js"></script>
+  <script src="js/vendor/china-geo.js"></script>
+  <script src="js/city-coords.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/sync-config.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
