@@ -232,6 +232,7 @@
     e.preventDefault();
     var start = $('#f-start').value, end = $('#f-end').value;
     if (end < start) { alert('返回日期不能早于出发日期'); return; }
+    if (editingTripId && !confirm('确定保存对这次旅行的修改吗？')) return; /* 防误触 */
 
     var data = {
       title: $('#f-title').value.trim(),
@@ -392,6 +393,7 @@
       : null;
 
     if (m) {
+      if (!confirm('确定保存对这个瞬间的修改吗？')) return; /* 防误触 */
       m.caption = caption;
       m.date = date;
       if (momentState.pendingImage) m.image = momentState.pendingImage; // 不换图则保留原图
@@ -418,6 +420,7 @@
   function deleteMoment(tripId, momentId) {
     var t = trips.find(function (x) { return x.id === tripId; });
     if (!t) return;
+    if (!confirm('确定删除这个瞬间吗？删了就找不回来了。')) return; /* 防误触 */
     t.moments = (t.moments || []).filter(function (m) { return m.id !== momentId; });
     if (window.Sync) Sync.upsertTrip(t); /* 同步到云端 */
     saveTrips(trips);
