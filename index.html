@@ -12,7 +12,7 @@
       <div class="logo">✈ 我们的旅行</div>
       <nav class="nav">
         <a href="#timeline">时间线</a>
-        <a href="#map-section">足迹</a>
+        <a href="#cities">足迹</a>
         <button id="btn-settings" class="link-btn" type="button">设置</button>
         <button id="btn-add-trip" class="btn btn-primary" type="button">+ 记录一次旅行</button>
       </nav>
@@ -35,7 +35,6 @@
       <option value="">全部年份</option>
     </select>
     <span class="toolbar-spacer"></span>
-    <span id="sync-status" class="sync-status"></span>
     <button id="btn-export" class="btn btn-ghost" type="button">导出备份</button>
     <label class="btn btn-ghost">
       导入备份
@@ -51,13 +50,6 @@
         <p>还没有旅行记录。</p>
         <p>点击右上角「记录一次旅行」，写下你们的第一段故事吧。</p>
       </div>
-    </section>
-
-    <section id="map-section" class="container">
-      <h2 class="section-title">我们的足迹地图</h2>
-      <p class="map-tip">拖动旋转 · 滚轮缩放 · 点击标记可打开对应的旅行</p>
-      <div id="china-map" class="china-map"></div>
-      <p id="map-unmatched" class="map-unmatched hidden"></p>
     </section>
 
     <section id="cities" class="container">
@@ -142,35 +134,6 @@
     <div class="modal-panel modal-panel-wide" id="detail-content"></div>
   </div>
 
-  <!-- 添加 / 编辑瞬间 -->
-  <div class="modal hidden" id="moment-modal">
-    <div class="modal-panel">
-      <h3 id="moment-modal-title">添加瞬间</h3>
-      <form id="moment-form">
-        <div class="form-row">
-          <label>照片（可选）
-            <input type="file" id="m-file" accept="image/*">
-          </label>
-          <div id="m-preview" class="cover-preview hidden"></div>
-        </div>
-        <div class="form-row">
-          <label>这一刻
-            <input type="text" id="m-caption" maxlength="60" placeholder="这一刻发生了什么？">
-          </label>
-        </div>
-        <div class="form-row">
-          <label>日期（可选）
-            <input type="date" id="m-date">
-          </label>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-ghost" data-close>取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- 设置 -->
   <div class="modal hidden" id="settings-modal">
     <div class="modal-panel">
@@ -197,20 +160,8 @@
     </div>
   </div>
 
-  <!-- 图片放大查看 -->
-  <div class="lightbox hidden" id="lightbox">
-    <img id="lightbox-img" src="" alt="照片">
-    <p class="lightbox-caption" id="lightbox-caption"></p>
-  </div>
-
-  <script src="js/vendor/echarts.min.js"></script>
-  <script src="js/vendor/echarts-gl.min.js"></script>
-  <script src="js/vendor/china-geo.js"></script>
-  <script src="js/city-coords.js"></script>
-  <script src="js/map.js"></script>
-  <script src="js/sync-config.js"></script>
-  <script src="js/sync.js"></script>
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/leaves.js"></script>
 </body>
 </html>

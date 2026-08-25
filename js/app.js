@@ -11,7 +11,6 @@
   var editingTripId = null;   // 正在编辑的旅行 id（null 表示新增）
   var currentDetailId = null; // 详情弹窗当前展示的旅行 id
   var pendingCover = null;    // 表单里新选择、尚未保存的封面图 dataURL
-  var momentState = { tripId: null, momentId: null, pendingImage: null }; // 瞬间弹窗状态
 
   /* ---------- 工具 ---------- */
 
@@ -72,20 +71,7 @@
   }
 
   function openModal(id) { $(id).classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
-  function closeModal(el) {
-    el.classList.add('hidden');
-    if (!$$('.modal:not(.hidden)').length) document.body.style.overflow = '';
-  }
-
-  /* ---------- 图片放大查看 ---------- */
-
-  function openLightbox(src, caption) {
-    $('#lightbox-img').src = src;
-    $('#lightbox-caption').textContent = caption || '';
-    $('#lightbox').classList.remove('hidden');
-  }
-
-  function closeLightbox() { $('#lightbox').classList.add('hidden'); }
+  function closeModal(el) { el.classList.add('hidden'); document.body.style.overflow = ''; }
 
   /* ---------- 渲染 ---------- */
 
@@ -95,7 +81,6 @@
     renderYearOptions();
     renderTimeline();
     renderCities();
-    if (window.TravelMap) TravelMap.render(trips, openDetail);
   }
 
   function renderHero() {
@@ -232,7 +217,6 @@
     e.preventDefault();
     var start = $('#f-start').value, end = $('#f-end').value;
     if (end < start) { alert('返回日期不能早于出发日期'); return; }
-    if (editingTripId && !confirm('确定保存对这次旅行的修改吗？')) return; /* 防误触 */
 
     var data = {
       title: $('#f-title').value.trim(),
@@ -264,7 +248,6 @@
       data.moments = [];
       trips.push(data);
     }
-    if (window.Sync) Sync.upsertTrip(editingTripId ? t : data); /* 同步到云端 */
     saveTrips(trips);
     closeModal($('#trip-modal'));
     renderAll();
@@ -274,7 +257,6 @@
   function deleteTrip(id) {
     if (!confirm('确定删除这次旅行吗？里面的瞬间也会一起删掉，删了就找不回来了。')) return;
     trips = trips.filter(function (t) { return t.id !== id; });
-    if (window.Sync) Sync.removeTrip(id); /* 云端同步删除 */
     saveTrips(trips);
     closeModal($('#detail-modal'));
     currentDetailId = null;
@@ -288,11 +270,8 @@
     if (!t) return;
     currentDetailId = id;
 
-    var sorted = (t.moments || []).slice().sort(momentCompare);
-    var moments = sorted.map(function (m) {
-      return '<div class="moment-card' + (m.pinned ? ' pinned' : '') + '">' +
-        '<button class="moment-pin' + (m.pinned ? ' pinned' : '') + '" data-mid="' + m.id + '" title="' + (m.pinned ? '取消置顶' : '置顶') + '">📌</button>' +
-        '<button class="moment-edit" data-mid="' + m.id + '" title="编辑">✎</button>' +
+    var moments = (t.moments || []).map(function (m) {
+      return '<div class="moment-card">' +
         '<button class="moment-del" data-mid="' + m.id + '" title="删除">×</button>' +
         '<div class="moment-img">' + visualHTML(m, '📷') + '</div>' +
         '<p class="moment-caption">' + esc(m.caption) + '</p>' +
@@ -315,11 +294,14 @@
         '<button class="btn btn-ghost btn-small" id="detail-edit">编辑</button>' +
         '<button class="btn btn-danger btn-small" id="detail-delete">删除这次旅行</button>' +
       '</div>' +
-      '<div class="moments-header">' +
-        '<h4 class="moments-title">心动瞬间（' + (t.moments || []).length + '）</h4>' +
-        '<button class="btn btn-primary btn-small" id="moment-open-add" type="button">+ 添加瞬间</button>' +
+      '<h4 class="moments-title">心动瞬间（' + (t.moments || []).length + '）</h4>' +
+      '<div class="moments-grid">' + (moments || '<p style="color:var(--ink-light);font-size:14px">还没有瞬间，在下面添加第一条吧。</p>') + '</div>' +
+      '<div class="moment-add">' +
+        '<input type="file" id="moment-file" accept="image/*">' +
+        '<input type="text" id="moment-caption" maxlength="60" placeholder="这一刻发生了什么？">' +
+        '<input type="date" id="moment-date">' +
+        '<button class="btn btn-primary btn-small" id="moment-add-btn" type="button">添加瞬间</button>' +
       '</div>' +
-      '<div class="moments-grid">' + (moments || '<p style="color:var(--ink-light);font-size:14px">还没有瞬间，点右上角「+ 添加瞬间」记录第一条吧。</p>') + '</div>' +
       '<div class="detail-close-row"><button class="btn btn-ghost" data-close>关闭</button></div>';
 
     $('#detail-edit').addEventListener('click', function () {
@@ -327,23 +309,9 @@
       openTripModal(t);
     });
     $('#detail-delete').addEventListener('click', function () { deleteTrip(id); });
-    $('#moment-open-add').addEventListener('click', function () { openMomentModal(id, null); });
-    $$('.moment-edit', $('#detail-content')).forEach(function (btn) {
-      btn.addEventListener('click', function () { openMomentModal(id, btn.dataset.mid); });
-    });
+    $('#moment-add-btn').addEventListener('click', function () { addMoment(id); });
     $$('.moment-del', $('#detail-content')).forEach(function (btn) {
       btn.addEventListener('click', function () { deleteMoment(id, btn.dataset.mid); });
-    });
-    $$('.moment-pin', $('#detail-content')).forEach(function (btn) {
-      btn.addEventListener('click', function () { togglePinMoment(id, btn.dataset.mid); });
-    });
-    /* 点击图片放大查看 */
-    var coverImg = $('#detail-content .detail-cover img');
-    if (coverImg) coverImg.addEventListener('click', function () { openLightbox(t.cover, t.title); });
-    $$('.moment-card', $('#detail-content')).forEach(function (card, i) {
-      var m = sorted[i];
-      var img = card.querySelector('.moment-img img');
-      if (m && img) img.addEventListener('click', function () { openLightbox(m.image, m.caption); });
     });
     bindCloseButtons($('#detail-content'));
 
@@ -352,95 +320,42 @@
 
   /* ---------- 瞬间 ---------- */
 
-  /* momentId 为 null 时是添加，否则是编辑 */
-  function openMomentModal(tripId, momentId) {
+  function addMoment(tripId) {
     var t = trips.find(function (x) { return x.id === tripId; });
     if (!t) return;
-    var m = momentId ? (t.moments || []).find(function (x) { return x.id === momentId; }) : null;
-    momentState.tripId = tripId;
-    momentState.momentId = m ? m.id : null;
-    momentState.pendingImage = null;
-    $('#moment-modal-title').textContent = m ? '编辑瞬间' : '添加瞬间';
-    $('#m-caption').value = m ? (m.caption || '') : '';
-    $('#m-date').value = m ? (m.date || '') : '';
-    $('#m-file').value = '';
-    updateMomentPreview(m);
-    openModal('#moment-modal');
-  }
+    var file = $('#moment-file').files[0];
+    var caption = $('#moment-caption').value.trim();
+    var date = $('#moment-date').value;
+    if (!file && !caption) { alert('至少加一张照片或写一句话吧'); return; }
 
-  function updateMomentPreview(m) {
-    var box = $('#m-preview');
-    if (momentState.pendingImage) {
-      box.innerHTML = '<img src="' + momentState.pendingImage + '" alt="">';
-      box.classList.remove('hidden');
-    } else if (m && (m.image || m.emoji)) {
-      box.innerHTML = visualHTML(m, '📷');
-      box.classList.remove('hidden');
-    } else {
-      box.innerHTML = '';
-      box.classList.add('hidden');
-    }
-  }
+    var emojis = ['📷', '🍜', '🌄', '🎡', '🏖️', '🚂', '🌃', '🍦'];
+    var moment = {
+      id: uuid(),
+      image: '',
+      emoji: emojis[Math.floor(Math.random() * emojis.length)],
+      caption: caption,
+      date: date
+    };
 
-  function saveMoment(e) {
-    e.preventDefault();
-    var t = trips.find(function (x) { return x.id === momentState.tripId; });
-    if (!t) return;
-    var caption = $('#m-caption').value.trim();
-    var date = $('#m-date').value;
-    var m = momentState.momentId
-      ? (t.moments || []).find(function (x) { return x.id === momentState.momentId; })
-      : null;
-
-    if (m) {
-      if (!confirm('确定保存对这个瞬间的修改吗？')) return; /* 防误触 */
-      m.caption = caption;
-      m.date = date;
-      if (momentState.pendingImage) m.image = momentState.pendingImage; // 不换图则保留原图
-    } else {
-      if (!momentState.pendingImage && !caption) { alert('至少加一张照片或写一句话吧'); return; }
-      var emojis = ['📷', '🍜', '🌄', '🎡', '🏖️', '🚂', '🌃', '🍦'];
+    function finish() {
       t.moments = t.moments || [];
-      t.moments.push({
-        id: uuid(),
-        image: momentState.pendingImage || '',
-        emoji: emojis[Math.floor(Math.random() * emojis.length)],
-        caption: caption,
-        date: date
-      });
+      t.moments.push(moment);
+      saveTrips(trips);
+      openDetail(tripId); // 重绘详情
+      renderAll();
     }
 
-    if (window.Sync) Sync.upsertTrip(t); /* 同步到云端 */
-    saveTrips(trips);
-    closeModal($('#moment-modal'));
-    openDetail(t.id); // 重绘详情
-    renderAll();
+    if (file) {
+      readImage(file, function (dataURL) { moment.image = dataURL; finish(); });
+    } else {
+      finish();
+    }
   }
 
   function deleteMoment(tripId, momentId) {
     var t = trips.find(function (x) { return x.id === tripId; });
     if (!t) return;
-    if (!confirm('确定删除这个瞬间吗？删了就找不回来了。')) return; /* 防误触 */
     t.moments = (t.moments || []).filter(function (m) { return m.id !== momentId; });
-    if (window.Sync) Sync.upsertTrip(t); /* 同步到云端 */
-    saveTrips(trips);
-    openDetail(tripId);
-    renderAll();
-  }
-
-  /* 置顶的排最前，其余按日期从先到后；没填日期的排在最后 */
-  function momentCompare(a, b) {
-    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-    return (a.date || '9999').localeCompare(b.date || '9999');
-  }
-
-  function togglePinMoment(tripId, momentId) {
-    var t = trips.find(function (x) { return x.id === tripId; });
-    if (!t) return;
-    var m = (t.moments || []).find(function (x) { return x.id === momentId; });
-    if (!m) return;
-    m.pinned = !m.pinned;
-    if (window.Sync) Sync.upsertTrip(t); /* 同步到云端 */
     saveTrips(trips);
     openDetail(tripId);
     renderAll();
@@ -463,7 +378,6 @@
       togetherDate: $('#s-together-date').value
     };
     saveSettings(settings);
-    if (window.Sync) Sync.pushSettings(settings); /* 同步到云端 */
     closeModal($('#settings-modal'));
     renderHero();
   }
@@ -491,7 +405,6 @@
         if (data.settings) settings = data.settings;
         saveTrips(trips);
         saveSettings(settings);
-        if (window.Sync) Sync.replaceAll(trips, settings); /* 整体覆盖云端 */
         renderAll();
         alert('导入成功');
       } catch (e) {
@@ -526,82 +439,16 @@
       if (!file) return;
       readImage(file, function (dataURL) { pendingCover = dataURL; updateCoverPreview(null); });
     });
-    $('#moment-form').addEventListener('submit', saveMoment);
-    $('#m-file').addEventListener('change', function (e) {
-      var file = e.target.files[0];
-      if (!file) return;
-      readImage(file, function (dataURL) { momentState.pendingImage = dataURL; updateMomentPreview(null); });
-    });
 
     bindCloseButtons(document);
-    $('#lightbox').addEventListener('click', closeLightbox);
     $$('.modal').forEach(function (modal) {
       modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(modal); });
     });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') {
-        if (!$('#lightbox').classList.contains('hidden')) { closeLightbox(); return; }
-        var open = $$('.modal:not(.hidden)');
-        if (open.length) closeModal(open[open.length - 1]); // 只关最上层弹窗
-      }
+      if (e.key === 'Escape') $$('.modal:not(.hidden)').forEach(closeModal);
     });
 
     renderAll();
-    bootSync();
-  }
-
-  /* ---------- 云端同步 ---------- */
-
-  function applyRemote(remote) {
-    trips = remote.trips || [];
-    if (remote.settings) settings = remote.settings;
-    saveTrips(trips);
-    saveSettings(settings);
-    renderAll();
-  }
-
-  function sameData(remote) {
-    var sortById = function (arr) {
-      return arr.slice().sort(function (a, b) { return String(a.id).localeCompare(String(b.id)); });
-    };
-    return JSON.stringify(sortById(remote.trips || [])) === JSON.stringify(sortById(trips)) &&
-      JSON.stringify(remote.settings || null) === JSON.stringify(settings);
-  }
-
-  function anyModalOpen() {
-    return !!document.querySelector('.modal:not(.hidden)') || !$('#lightbox').classList.contains('hidden');
-  }
-
-  /* 拉取云端最新数据；本地与云端一致或正在编辑时不打扰 */
-  function refreshFromCloud() {
-    if (!window.Sync || !Sync.enabled) return;
-    Sync.loadAll().then(function (remote) {
-      if (!remote || anyModalOpen()) return;
-      if (!sameData(remote)) applyRemote(remote);
-    }).catch(function () { /* 网络失败就保持本地数据 */ });
-  }
-
-  function bootSync() {
-    var el = $('#sync-status');
-    if (!window.Sync || !Sync.enabled) {
-      if (el) { el.textContent = '本地模式'; el.title = '未配置云端同步，数据只保存在这个浏览器里'; }
-      return;
-    }
-    if (el) el.textContent = '云端同步中…';
-    Sync.loadAll().then(function (remote) {
-      if (remote.trips.length) {
-        applyRemote(remote); /* 云端有数据：以云端为准 */
-      } else if (localStorage.getItem(STORAGE_KEY) && trips.length) {
-        Sync.pushAll(trips, settings); /* 首次连接：把本机已有记录上传到云端 */
-      }
-      if (el) el.textContent = '云端同步已开启';
-    }).catch(function () {
-      if (el) el.textContent = '云端连接失败，暂用本地数据';
-    });
-    setInterval(refreshFromCloud, 60000);
-    document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) refreshFromCloud();
-    });
   }
 
   init();

@@ -1,12 +1,12 @@
 /* ===== 基础 ===== */
 :root {
   --bg: #fdf8f2;
-  --card: #ffffff;
-  --ink: #3a2e2a;
+  --card: rgba(255, 255, 255, 0.72);
+  --ink: rgba(58, 46, 42, 0.88);
   --ink-light: #8a7a72;
   --accent: #e07856;
   --accent-dark: #c85f42;
-  --soft: #f6e7dc;
+  --soft: rgba(246, 231, 220, 0.6);
   --line: #efe0d4;
   --gold: #d9a441;
   --shadow: 0 6px 24px rgba(90, 60, 40, 0.10);
@@ -26,6 +26,51 @@ body {
 
 .container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
 
+/* ===== 全局背景：固定小熊图 + 氛围特效 ===== */
+/* 图片层：position: fixed 让滚轮滑动时背景保持不动；inset 负值为缩放动画留出余量 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -4%;
+  z-index: -2;
+  background:
+    linear-gradient(rgba(253, 248, 242, 0.45), rgba(253, 248, 242, 0.30)),
+    url('../assets/bg-bears.jpg') center / cover no-repeat;
+  opacity: 0.55;
+  animation: bg-breathe 36s ease-in-out infinite alternate;
+}
+
+/* 光斑层：几片柔和的暖色光晕缓慢漂移，营造氛围感 */
+body::after {
+  content: '';
+  position: fixed;
+  inset: -10%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 28%, rgba(255, 214, 170, 0.55), transparent 24%),
+    radial-gradient(circle at 80% 16%, rgba(255, 236, 200, 0.50), transparent 22%),
+    radial-gradient(circle at 68% 80%, rgba(224, 120, 86, 0.20), transparent 28%),
+    radial-gradient(circle at 28% 86%, rgba(217, 164, 65, 0.18), transparent 26%),
+    radial-gradient(ellipse at center, transparent 55%, rgba(90, 60, 40, 0.10) 100%);
+  filter: blur(30px);
+  animation: light-drift 28s ease-in-out infinite alternate;
+}
+
+@keyframes bg-breathe {
+  from { transform: scale(1); }
+  to   { transform: scale(1.06); }
+}
+
+@keyframes light-drift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to   { transform: translate3d(2%, 2%, 0) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after { animation: none; }
+}
+
 h1, h2, h3, .logo {
   font-family: "Noto Serif SC", "STSong", "SimSun", serif;
   font-weight: 700;
@@ -39,7 +84,7 @@ h1, h2, h3, .logo {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(253, 248, 242, 0.9);
+  background: rgba(253, 248, 242, 0.62);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
@@ -92,7 +137,7 @@ h1, h2, h3, .logo {
 .btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); }
 
 .btn-ghost {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.5);
   color: var(--ink-light);
   border: 1px solid var(--line);
 }
@@ -401,14 +446,14 @@ textarea { resize: vertical; }
   height: 140px;
   border-radius: 10px;
   overflow: hidden;
-  background: #26211e;
+  background: var(--soft);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 40px;
 }
 
-.cover-preview img { width: 100%; height: 100%; object-fit: contain; }
+.cover-preview img { width: 100%; height: 100%; object-fit: cover; }
 
 /* ===== 详情弹窗 ===== */
 .detail-cover {
@@ -471,10 +516,10 @@ textarea { resize: vertical; }
   align-items: center;
   justify-content: center;
   font-size: 44px;
-  background: #26211e;
+  background: var(--soft);
 }
 
-.moment-img img { width: 100%; height: 100%; object-fit: contain; }
+.moment-img img { width: 100%; height: 100%; object-fit: cover; }
 
 .moment-caption { padding: 8px 10px; font-size: 13px; }
 
@@ -495,143 +540,25 @@ textarea { resize: vertical; }
   line-height: 1;
 }
 
-.moments-header {
+.moment-add {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 10px;
-  margin-bottom: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px;
 }
 
-.moments-header .moments-title { margin-bottom: 0; }
-
-.moment-edit {
-  position: absolute;
-  top: 6px;
-  right: 34px;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
-  color: #fff;
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-}
-
-.moment-pin {
-  position: absolute;
-  top: 6px;
-  right: 62px;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
-  color: #fff;
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-}
-
-.moment-pin.pinned { background: var(--accent); }
-
-.moment-card.pinned { border-color: var(--accent); }
+.moment-add input[type="text"] { flex: 1; min-width: 160px; }
+.moment-add input[type="date"] { width: 150px; }
+.moment-add input[type="file"] { font-size: 13px; color: var(--ink-light); }
 
 .detail-close-row {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
-}
-
-/* ===== 图片放大灯箱 ===== */
-.detail-cover img, .moment-img img { cursor: zoom-in; }
-
-.lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  background: rgba(0, 0, 0, 0.88);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 24px;
-  cursor: zoom-out;
-}
-
-.lightbox img {
-  max-width: 94vw;
-  max-height: 84vh;
-  border-radius: 8px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-
-.lightbox-caption {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 15px;
-  text-align: center;
-}
-
-/* ===== 3D 足迹地图 ===== */
-.china-map {
-  position: relative;
-  width: 100%;
-  height: 540px;
-  background: linear-gradient(180deg, #0c2038 0%, #081426 100%);
-  border: 1px solid #1d3d63;
-  border-radius: var(--radius);
-  box-shadow: 0 10px 34px rgba(8, 20, 38, 0.35);
-  overflow: hidden;
-}
-
-/* 城市名标签层（HTML 覆盖在 3D 画布上） */
-#map-labels {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 10;
-  overflow: hidden;
-}
-
-.map-city-label {
-  position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: auto;
-  cursor: pointer;
-  white-space: nowrap;
-  font-family: "STKaiti", "KaiTi", "楷体", "Noto Serif SC", serif;
-  font-size: 16px;
-  letter-spacing: 2px;
-  color: #ffe8b8;
-  text-shadow:
-    0 0 8px rgba(255, 205, 110, 0.55),
-    0 1px 4px rgba(0, 0, 0, 0.85);
-  transition: color 0.15s;
-}
-
-.map-city-label:hover { color: #fff6e0; }
-
-.map-tip {
-  color: var(--ink-light);
-  font-size: 13px;
-  margin: -12px 0 12px;
-  padding-left: 14px;
-}
-
-.map-unmatched {
-  font-size: 13px;
-  color: var(--ink-light);
-  margin-top: 10px;
-}
-
-.sync-status {
-  font-size: 12px;
-  color: var(--ink-light);
-  align-self: center;
 }
 
 /* ===== 响应式 ===== */
@@ -644,5 +571,35 @@ textarea { resize: vertical; }
   .toolbar input[type="search"] { width: 100%; }
   .nav { gap: 12px; }
   .nav a { display: none; }
-  .china-map { height: 380px; }
+}
+
+/* ===== 半透明毛玻璃：内容不遮挡背景 ===== */
+.stat-card, .trip-card, .city-tag, .modal-panel, .btn-ghost {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ===== 落叶特效 ===== */
+.leaf {
+  position: fixed;
+  top: -10vh;
+  z-index: 40;
+  pointer-events: none;
+  animation: leaf-fall linear infinite;
+  will-change: transform;
+}
+
+.leaf > span {
+  display: inline-block;
+  animation: leaf-sway ease-in-out infinite alternate;
+}
+
+@keyframes leaf-fall {
+  from { transform: translateY(0) rotate(0deg); }
+  to   { transform: translateY(125vh) rotate(360deg); }
+}
+
+@keyframes leaf-sway {
+  from { transform: translateX(-26px) rotate(-24deg); }
+  to   { transform: translateX(26px) rotate(24deg); }
 }
