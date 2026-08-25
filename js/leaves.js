@@ -1,35 +1,38 @@
-/* 落叶氛围特效：随机生成若干叶子，循环飘落 + 左右摇摆 */
-
+/* ===== 落叶飘动特效 =====
+   独立于业务逻辑：生成一个固定定位的落叶层，
+   定时飘落 🍂 / 🍁，动画结束后自动移除并循环补充。 */
 (function () {
-  'use strict';
-
-  /* 系统开启「减少动态效果」时不生成 */
+  // 尊重系统的“减少动态效果”设置
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-  var LEAF_CHARS = ['🍂', '🍁'];
-  var COUNT = 12;
+  var layer = document.createElement('div');
+  layer.className = 'leaves-layer';
+  layer.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(layer);
 
-  for (var i = 0; i < COUNT; i++) {
-    var leaf = document.createElement('div');
+  var LEAVES = ['🍂', '🍁'];
+  var MAX_LEAVES = 14;
+
+  function spawnLeaf() {
+    if (document.hidden) return;
+    var leaf = document.createElement('span');
     leaf.className = 'leaf';
-    leaf.setAttribute('aria-hidden', 'true');
-
-    var inner = document.createElement('span');
-    inner.textContent = LEAF_CHARS[Math.floor(Math.random() * LEAF_CHARS.length)];
-    leaf.appendChild(inner);
-
-    var fallDur = 10 + Math.random() * 9;    // 下落一圈 10–19s
-    var swayDur = 2.2 + Math.random() * 2;   // 摇摆周期 2.2–4.2s
-
+    leaf.textContent = LEAVES[Math.floor(Math.random() * LEAVES.length)];
     leaf.style.left = (Math.random() * 100).toFixed(2) + 'vw';
-    leaf.style.fontSize = (14 + Math.random() * 14).toFixed(0) + 'px';
-    leaf.style.opacity = (0.45 + Math.random() * 0.35).toFixed(2);
-    leaf.style.animationDuration = fallDur.toFixed(1) + 's';
-    /* 负延迟让首屏叶子就散布在不同高度，而不是同时从顶部出现 */
-    leaf.style.animationDelay = (-Math.random() * fallDur).toFixed(1) + 's';
-    inner.style.animationDuration = swayDur.toFixed(1) + 's';
-    inner.style.animationDelay = (-Math.random() * swayDur).toFixed(1) + 's';
-
-    document.body.appendChild(leaf);
+    leaf.style.fontSize = (14 + Math.random() * 16).toFixed(0) + 'px';
+    leaf.style.opacity = (0.55 + Math.random() * 0.35).toFixed(2);
+    leaf.style.setProperty('--drift', ((Math.random() * 2 - 1) * 120).toFixed(0) + 'px');
+    leaf.style.setProperty('--spin', (Math.random() * 720 - 360).toFixed(0) + 'deg');
+    leaf.style.animationDuration = (9 + Math.random() * 8).toFixed(2) + 's';
+    leaf.addEventListener('animationend', function () { leaf.remove(); });
+    layer.appendChild(leaf);
   }
+
+  // 开场先错落飘几片，之后按固定节奏补充
+  for (var i = 0; i < 6; i++) {
+    setTimeout(spawnLeaf, i * 900);
+  }
+  setInterval(function () {
+    if (layer.childElementCount < MAX_LEAVES) spawnLeaf();
+  }, 1600);
 })();

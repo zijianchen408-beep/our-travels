@@ -42,17 +42,17 @@ function saveSettings(s) {
 const SAMPLE_TRIPS = [
   {
     id: 'sample-1',
-    title: '京都赏枫之旅',
-    destination: '京都',
-    startDate: '2024-11-15',
-    endDate: '2024-11-20',
+    title: '初见',
+    destination: '黄山',
+    startDate: '2026-01-23',
+    endDate: '2026-01-26',
     weather: '晴',
     mood: '浪漫',
     rating: 5,
     gradient: 'linear-gradient(135deg, #e07856, #d9a441)',
     emoji: '🍁',
     cover: '',
-    description: '第一次一起出国旅行。清水寺的红叶比照片里更艳，傍晚在鸭川边坐了很久，什么都没说，但觉得很安心。',
+    description: '第一次和小丸子一起出国旅行。清水寺的红叶比照片里更艳，傍晚在鸭川边坐了很久，什么都没说，但觉得很安心。',
     moments: [
       { id: 'm1', image: '', emoji: '⛩️', caption: '伏见稻荷的千本鸟居，走到一半就开始下雨', date: '2024-11-16' },
       { id: 'm2', image: '', emoji: '🍵', caption: '在岚山喝了抹茶，她苦得皱眉头', date: '2024-11-17' },
@@ -61,8 +61,8 @@ const SAMPLE_TRIPS = [
   },
   {
     id: 'sample-2',
-    title: '大理慢生活',
-    destination: '大理',
+    title: '第一次和小丸子旅行',
+    destination: '南昌',
     startDate: '2025-04-02',
     endDate: '2025-04-06',
     weather: '多云',
