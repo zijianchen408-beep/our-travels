@@ -148,10 +148,16 @@
       <h3 id="moment-modal-title">添加瞬间</h3>
       <form id="moment-form">
         <div class="form-row">
-          <label>照片（可选）
-            <input type="file" id="m-file" accept="image/*">
+          <label>照片或视频（可选）
+            <input type="file" id="m-file" accept="image/*,video/*">
           </label>
+          <p class="form-hint">视频单个不超过 50MB，保存时会上传到云端</p>
           <div id="m-preview" class="cover-preview hidden"></div>
+          <p id="m-media-info" class="form-hint hidden"></p>
+          <div id="m-upload" class="upload-progress hidden">
+            <div class="upload-bar"><span id="m-upload-bar"></span></div>
+            <p id="m-upload-text" class="form-hint">正在上传视频… 0%</p>
+          </div>
         </div>
         <div class="form-row">
           <label>这一刻
@@ -197,9 +203,11 @@
     </div>
   </div>
 
-  <!-- 图片放大查看 -->
+  <!-- 图片放大 / 视频播放 -->
   <div class="lightbox hidden" id="lightbox">
+    <button class="lightbox-close" id="lightbox-close" type="button" title="关闭">×</button>
     <img id="lightbox-img" src="" alt="照片">
+    <video id="lightbox-video" class="hidden" controls playsinline preload="metadata"></video>
     <p class="lightbox-caption" id="lightbox-caption"></p>
   </div>
 

@@ -2,6 +2,7 @@
  * 填入 Supabase 项目的 URL 和 anon key 后，旅行数据会自动同步到云端，
  * 所有打开这个网站的人看到的是同一份数据。
  * 两个值都为空时 = 本地模式（数据只存在当前浏览器，和以前一样）。
+ * 上传视频需要云端同步，并且要先在 Supabase 的 SQL Editor 里运行一次 supabase-video-setup.sql。
  */
 window.SYNC_CONFIG = {
   url: 'https://kbfhhoamznyjrorftknk.supabase.co',

@@ -460,6 +460,51 @@ textarea { resize: vertical; }
 
 .cover-preview img { width: 100%; height: 100%; object-fit: contain; }
 
+.form-hint { font-size: 12px; color: var(--ink-light); margin-top: 4px; }
+
+/* 视频上传进度 */
+.upload-progress { margin-top: 10px; }
+
+.upload-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--soft);
+  overflow: hidden;
+}
+
+.upload-bar span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+/* 视频封面上的播放按钮 */
+.cover-preview, .moment-img { position: relative; }
+
+.play-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  padding-left: 3px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: 16px;
+  line-height: 40px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.moment-img.is-video { cursor: pointer; }
+
 /* ===== 详情弹窗 ===== */
 .detail-cover {
   height: 240px;
@@ -585,6 +630,9 @@ textarea { resize: vertical; }
   line-height: 1;
 }
 
+/* 图片区域是定位元素（要叠播放按钮），按钮得压在它上面 */
+.moment-pin, .moment-edit, .moment-del { z-index: 2; }
+
 .moment-pin.pinned { background: var(--accent); }
 
 .moment-card.pinned { border-color: var(--accent); }
@@ -618,6 +666,32 @@ textarea { resize: vertical; }
   border-radius: 8px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
+
+.lightbox video {
+  max-width: 94vw;
+  max-height: 80vh;
+  border-radius: 8px;
+  background: #000;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lightbox-close:hover { background: rgba(255, 255, 255, 0.28); }
 
 .lightbox-caption {
   color: rgba(255, 255, 255, 0.85);

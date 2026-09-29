@@ -11,7 +11,11 @@
   var editingTripId = null;   // 正在编辑的旅行 id（null 表示新增）
   var currentDetailId = null; // 详情弹窗当前展示的旅行 id
   var pendingCover = null;    // 表单里新选择、尚未保存的封面图 dataURL
-  var momentState = { tripId: null, momentId: null, pendingImage: null }; // 瞬间弹窗状态
+  /* 瞬间弹窗状态：pendingImage 是新选的照片或新视频的封面帧，pendingVideo 是待上传的视频文件，
+   * upload 是进行中的上传，pickToken 用来丢弃过期的异步读取结果 */
+  var momentState = { tripId: null, momentId: null, pendingImage: null, pendingVideo: null, upload: null, pickToken: 0 };
+  var VIDEO_MAX_MB = 50; // Supabase 免费版单文件上限
+  var PLAY_BADGE = '<span class="play-badge">▶︎</span>';
 
   /* ---------- 工具 ---------- */
 
@@ -71,21 +75,84 @@
     reader.readAsDataURL(file);
   }
 
+  function isVideoFile(file) {
+    return /^video\//.test(file.type) || /\.(mp4|mov|m4v|webm|3gp|mkv)$/i.test(file.name);
+  }
+
+  function mb(bytes) { return (bytes / 1048576).toFixed(1); }
+
+  /* 从视频里截一帧当封面（压缩后存进瞬间的 image）；浏览器解不了这个格式时返回空字符串 */
+  function makeVideoPoster(file, cb) {
+    var url = URL.createObjectURL(file);
+    var v = document.createElement('video');
+    var finished = false;
+    var timer = setTimeout(function () { finish(''); }, 8000);
+    function finish(dataURL) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      v.removeAttribute('src'); v.load();
+      URL.revokeObjectURL(url);
+      cb(dataURL);
+    }
+    v.muted = true; v.playsInline = true; v.preload = 'auto';
+    v.onloadedmetadata = function () {
+      v.currentTime = isFinite(v.duration) ? Math.max(0.05, Math.min(1, v.duration / 3)) : 0.05;
+    };
+    v.onseeked = function () {
+      try {
+        var w = v.videoWidth, h = v.videoHeight;
+        if (!w || !h) { finish(''); return; }
+        var k = Math.min(1, 640 / Math.max(w, h));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(w * k); canvas.height = Math.round(h * k);
+        canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+        finish(canvas.toDataURL('image/jpeg', 0.8));
+      } catch (e) { finish(''); }
+    };
+    v.onerror = function () { finish(''); };
+    v.src = url;
+    v.load();
+  }
+
   function openModal(id) { $(id).classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
   function closeModal(el) {
+    if (el.id === 'moment-modal' && momentState.upload) {
+      if (!confirm('视频还在上传，确定取消吗？')) return;
+      momentState.upload.abort();
+    }
     el.classList.add('hidden');
     if (!$$('.modal:not(.hidden)').length) document.body.style.overflow = '';
   }
 
-  /* ---------- 图片放大查看 ---------- */
+  /* ---------- 图片放大 / 视频播放 ---------- */
 
   function openLightbox(src, caption) {
+    $('#lightbox-video').classList.add('hidden');
     $('#lightbox-img').src = src;
+    $('#lightbox-img').classList.remove('hidden');
     $('#lightbox-caption').textContent = caption || '';
     $('#lightbox').classList.remove('hidden');
   }
 
-  function closeLightbox() { $('#lightbox').classList.add('hidden'); }
+  function openVideo(url, caption, poster) {
+    var v = $('#lightbox-video');
+    $('#lightbox-img').classList.add('hidden');
+    v.poster = poster || '';
+    v.src = url;
+    v.classList.remove('hidden');
+    $('#lightbox-caption').textContent = caption || '';
+    $('#lightbox').classList.remove('hidden');
+    var p = v.play();
+    if (p && p.catch) p.catch(function () { /* 自动播放被拦截时，由用户点播放 */ });
+  }
+
+  function closeLightbox() {
+    var v = $('#lightbox-video');
+    v.pause();
+    v.removeAttribute('src'); v.load(); // 停止继续下载
+    $('#lightbox').classList.add('hidden');
+  }
 
   /* ---------- 渲染 ---------- */
 
@@ -273,8 +340,12 @@
 
   function deleteTrip(id) {
     if (!confirm('确定删除这次旅行吗？里面的瞬间也会一起删掉，删了就找不回来了。')) return;
+    var gone = trips.find(function (t) { return t.id === id; });
     trips = trips.filter(function (t) { return t.id !== id; });
-    if (window.Sync) Sync.removeTrip(id); /* 云端同步删除 */
+    if (window.Sync) {
+      Sync.removeTrip(id); /* 云端同步删除 */
+      ((gone && gone.moments) || []).forEach(function (m) { if (m.video) Sync.removeVideo(m.video); });
+    }
     saveTrips(trips);
     closeModal($('#detail-modal'));
     currentDetailId = null;
@@ -294,7 +365,7 @@
         '<button class="moment-pin' + (m.pinned ? ' pinned' : '') + '" data-mid="' + m.id + '" title="' + (m.pinned ? '取消置顶' : '置顶') + '">📌</button>' +
         '<button class="moment-edit" data-mid="' + m.id + '" title="编辑">✎</button>' +
         '<button class="moment-del" data-mid="' + m.id + '" title="删除">×</button>' +
-        '<div class="moment-img">' + visualHTML(m, '📷') + '</div>' +
+        '<div class="moment-img' + (m.video ? ' is-video' : '') + '">' + visualHTML(m, '📷') + (m.video ? PLAY_BADGE : '') + '</div>' +
         '<p class="moment-caption">' + esc(m.caption) + '</p>' +
         (m.date ? '<p class="moment-date">' + fmtDate(m.date) + '</p>' : '') +
       '</div>';
@@ -342,8 +413,13 @@
     if (coverImg) coverImg.addEventListener('click', function () { openLightbox(t.cover, t.title); });
     $$('.moment-card', $('#detail-content')).forEach(function (card, i) {
       var m = sorted[i];
+      if (!m) return;
+      if (m.video) { /* 视频：点整块区域播放（没截到封面时也能点） */
+        card.querySelector('.moment-img').addEventListener('click', function () { openVideo(m.video, m.caption, m.image); });
+        return;
+      }
       var img = card.querySelector('.moment-img img');
-      if (m && img) img.addEventListener('click', function () { openLightbox(m.image, m.caption); });
+      if (img) img.addEventListener('click', function () { openLightbox(m.image, m.caption); });
     });
     bindCloseButtons($('#detail-content'));
 
@@ -360,21 +436,30 @@
     momentState.tripId = tripId;
     momentState.momentId = m ? m.id : null;
     momentState.pendingImage = null;
+    momentState.pendingVideo = null;
+    momentState.pickToken++;
     $('#moment-modal-title').textContent = m ? '编辑瞬间' : '添加瞬间';
     $('#m-caption').value = m ? (m.caption || '') : '';
     $('#m-date').value = m ? (m.date || '') : '';
     $('#m-file').value = '';
+    setUploading(false);
     updateMomentPreview(m);
     openModal('#moment-modal');
   }
 
   function updateMomentPreview(m) {
     var box = $('#m-preview');
-    if (momentState.pendingImage) {
-      box.innerHTML = '<img src="' + momentState.pendingImage + '" alt="">';
+    var info = $('#m-media-info');
+    var video = momentState.pendingVideo;
+    info.classList.toggle('hidden', !video);
+    if (video) info.textContent = '🎬 已选视频：' + video.name + '（' + mb(video.size) + ' MB）';
+
+    if (momentState.pendingImage || video) {
+      box.innerHTML = (momentState.pendingImage ? '<img src="' + momentState.pendingImage + '" alt="">' : '🎬') +
+        (video ? PLAY_BADGE : '');
       box.classList.remove('hidden');
     } else if (m && (m.image || m.emoji)) {
-      box.innerHTML = visualHTML(m, '📷');
+      box.innerHTML = visualHTML(m, '📷') + (m.video ? PLAY_BADGE : '');
       box.classList.remove('hidden');
     } else {
       box.innerHTML = '';
@@ -382,35 +467,145 @@
     }
   }
 
+  function pickMomentFile(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var token = ++momentState.pickToken;
+    momentState.pendingImage = null;
+    momentState.pendingVideo = null;
+
+    if (!isVideoFile(file)) {
+      readImage(file, function (dataURL) {
+        if (token !== momentState.pickToken) return; // 期间又换了文件
+        momentState.pendingImage = dataURL;
+        updateMomentPreview(null);
+      });
+      return;
+    }
+    if (!window.Sync || !Sync.enabled) {
+      alert('上传视频需要开启云端同步（视频太大，放不进浏览器本地存储）。');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > VIDEO_MAX_MB * 1048576) {
+      alert('这段视频有 ' + mb(file.size) + ' MB，超过了 ' + VIDEO_MAX_MB + ' MB 的上限，剪短或压缩一下再传吧。');
+      e.target.value = '';
+      return;
+    }
+    momentState.pendingVideo = file;
+    updateMomentPreview(null);
+    makeVideoPoster(file, function (poster) {
+      if (token !== momentState.pickToken) return;
+      momentState.pendingImage = poster || null;
+      updateMomentPreview(null);
+    });
+  }
+
+  function setUploading(on) {
+    var btn = $('#moment-form button[type="submit"]');
+    btn.disabled = on;
+    btn.textContent = on ? '上传中…' : '保存';
+    $('#m-file').disabled = on;
+    $('#m-upload').classList.toggle('hidden', !on);
+    if (on) setUploadProgress(0);
+  }
+
+  function setUploadProgress(ratio) {
+    var pct = Math.round(ratio * 100);
+    $('#m-upload-bar').style.width = pct + '%';
+    $('#m-upload-text').textContent = pct < 100 ? '正在上传视频… ' + pct + '%' : '上传完成，正在保存…';
+  }
+
+  function uploadErrorText(err) {
+    var msg = (err && err.message) || '';
+    if (/bucket not found/i.test(msg)) {
+      return '视频上传失败：云端还没有建好视频存储桶。\n请在 Supabase 控制台的 SQL Editor 里运行一次项目里的 supabase-video-setup.sql。';
+    }
+    if (/row-level security|policy|unauthorized|HTTP 40[13]/i.test(msg)) {
+      return '视频上传失败：云端存储没有上传权限，请运行 supabase-video-setup.sql 配置权限。';
+    }
+    if (/exceeded|too large|HTTP 413/i.test(msg)) {
+      return '视频上传失败：文件超过了云端的大小限制，剪短或压缩一下再试。';
+    }
+    return '视频上传失败：' + msg + '\n检查一下网络后再试一次。';
+  }
+
   function saveMoment(e) {
     e.preventDefault();
+    if (momentState.upload) return; // 上传中，防重复提交
     var t = trips.find(function (x) { return x.id === momentState.tripId; });
     if (!t) return;
     var caption = $('#m-caption').value.trim();
     var date = $('#m-date').value;
+    var editing = !!momentState.momentId;
+
+    if (editing) {
+      if (!confirm('确定保存对这个瞬间的修改吗？')) return; /* 防误触 */
+    } else if (!momentState.pendingImage && !momentState.pendingVideo && !caption) {
+      alert('至少加一张照片、一段视频或写一句话吧'); return;
+    }
+
+    var file = momentState.pendingVideo;
+    if (!file) { commitMoment(t.id, caption, date, ''); return; }
+
+    /* 有视频：先上传到云端，拿到链接再保存 */
+    var ext = (file.name.match(/\.([a-z0-9]{2,5})$/i) || [0, 'mp4'])[1].toLowerCase();
+    var up = Sync.uploadVideo(file, t.id + '/' + uuid() + '.' + ext, setUploadProgress);
+    momentState.upload = up;
+    setUploading(true);
+    up.done.then(function (url) {
+      momentState.upload = null;
+      setUploading(false);
+      commitMoment(t.id, caption, date, url);
+    }, function (err) {
+      momentState.upload = null;
+      setUploading(false);
+      if (err && err.message === '已取消') return;
+      alert(uploadErrorText(err));
+    });
+  }
+
+  /* 把弹窗里的内容写进瞬间；videoUrl 非空表示这次换成了新视频 */
+  function commitMoment(tripId, caption, date, videoUrl) {
+    var t = trips.find(function (x) { return x.id === tripId; });
+    if (!t) return;
     var m = momentState.momentId
       ? (t.moments || []).find(function (x) { return x.id === momentState.momentId; })
       : null;
+    var image = momentState.pendingImage; // 新选的照片，或新视频的封面帧
+    var oldVideo = '';
 
     if (m) {
-      if (!confirm('确定保存对这个瞬间的修改吗？')) return; /* 防误触 */
       m.caption = caption;
       m.date = date;
-      if (momentState.pendingImage) m.image = momentState.pendingImage; // 不换图则保留原图
+      if (videoUrl) {          // 换成新视频
+        oldVideo = m.video;
+        m.video = videoUrl;
+        m.image = image || '';
+        m.emoji = '🎬';
+      } else if (image) {      // 换成新照片
+        oldVideo = m.video;
+        delete m.video;
+        m.image = image;
+      }                        // 都没换则保留原来的
     } else {
-      if (!momentState.pendingImage && !caption) { alert('至少加一张照片或写一句话吧'); return; }
       var emojis = ['📷', '🍜', '🌄', '🎡', '🏖️', '🚂', '🌃', '🍦'];
-      t.moments = t.moments || [];
-      t.moments.push({
+      var added = {
         id: uuid(),
-        image: momentState.pendingImage || '',
-        emoji: emojis[Math.floor(Math.random() * emojis.length)],
+        image: image || '',
+        emoji: videoUrl ? '🎬' : emojis[Math.floor(Math.random() * emojis.length)],
         caption: caption,
         date: date
-      });
+      };
+      if (videoUrl) added.video = videoUrl;
+      t.moments = t.moments || [];
+      t.moments.push(added);
     }
 
-    if (window.Sync) Sync.upsertTrip(t); /* 同步到云端 */
+    if (window.Sync) {
+      Sync.upsertTrip(t); /* 同步到云端 */
+      if (oldVideo) Sync.removeVideo(oldVideo); /* 被替换掉的旧视频 */
+    }
     saveTrips(trips);
     closeModal($('#moment-modal'));
     openDetail(t.id); // 重绘详情
@@ -421,7 +616,9 @@
     var t = trips.find(function (x) { return x.id === tripId; });
     if (!t) return;
     if (!confirm('确定删除这个瞬间吗？删了就找不回来了。')) return; /* 防误触 */
+    var gone = (t.moments || []).find(function (m) { return m.id === momentId; });
     t.moments = (t.moments || []).filter(function (m) { return m.id !== momentId; });
+    if (window.Sync && gone && gone.video) Sync.removeVideo(gone.video);
     if (window.Sync) Sync.upsertTrip(t); /* 同步到云端 */
     saveTrips(trips);
     openDetail(tripId);
@@ -527,14 +724,13 @@
       readImage(file, function (dataURL) { pendingCover = dataURL; updateCoverPreview(null); });
     });
     $('#moment-form').addEventListener('submit', saveMoment);
-    $('#m-file').addEventListener('change', function (e) {
-      var file = e.target.files[0];
-      if (!file) return;
-      readImage(file, function (dataURL) { momentState.pendingImage = dataURL; updateMomentPreview(null); });
-    });
+    $('#m-file').addEventListener('change', pickMomentFile);
 
     bindCloseButtons(document);
-    $('#lightbox').addEventListener('click', closeLightbox);
+    $('#lightbox').addEventListener('click', function (e) {
+      if (e.target.id === 'lightbox-video') return; // 点视频本身是在操作播放器，不关闭
+      closeLightbox();
+    });
     $$('.modal').forEach(function (modal) {
       modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(modal); });
     });
